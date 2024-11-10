@@ -1,5 +1,5 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from os import makedirs
+import threading
 from PIL import Image
 from utils import pad_with_zeros, timer, BinayOperation
 import argparse
@@ -93,24 +93,28 @@ def run(
     # Create directory if it doesn't exist
     makedirs(output_dir, exist_ok=True)
 
-    with ThreadPoolExecutor() as executor:
-        futures = []
-        for i in range(total_frames_count):
-            percent = i / total_frames_count
-            on_finish = create_on_finish_callback(i)
+    threads = []
+    for i in range(total_frames_count):
+        percent = i / total_frames_count
+        operation = fade_operation(percent)
+        on_finish = create_on_finish_callback(i)
 
-            future = executor.submit(
-                process_frame,
+        thread = threading.Thread(
+            target=process_frame,
+            args=(
                 pixels1,
                 pixels2,
                 size,
-                fade_operation(percent),
+                operation,
                 on_finish,
-            )
-            futures.append(future)
+            ),
+        )
 
-        for future in as_completed(futures):
-            pass
+        threads.append(thread)
+        thread.start()
+
+    for thread in threads:
+        thread.join()
 
     for i in range(total_frames_count):
         save_image(results[i], i + 1)
