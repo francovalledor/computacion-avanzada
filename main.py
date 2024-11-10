@@ -50,6 +50,7 @@ def run(
     duration,
     frames_rate,
     output_dir,
+    verbose=False,
 ):
     total_frames_count = frames_rate * duration
     max_digit_length = len(str(total_frames_count))
@@ -76,9 +77,11 @@ def run(
     for i in range(total_frames_count):
         percent = i / total_frames_count
 
-        print(
-            f"Generating image {pad_with_zeros(i + 1, max_digit_length)}/{total_frames_count}"
-        )
+        if verbose:
+            print(
+                f"Generating image {pad_with_zeros(i + 1, max_digit_length)}/{total_frames_count}"
+            )
+
         result_image = process_images(pixels1, pixels2, size, fade_operation(percent))
         save_image(result_image, i + 1)
 
@@ -113,6 +116,10 @@ if __name__ == "__main__":
         help="Duration of the video in seconds.",
     )
 
+    parser.add_argument(
+        "--verbose", action="store_true", help="Enable detailed output."
+    )
+
     args = parser.parse_args()
 
     run(
@@ -121,4 +128,5 @@ if __name__ == "__main__":
         output_dir=args.output_dir,
         frames_rate=args.frames_per_second,
         duration=args.duration,
+        verbose=args.verbose,
     )
