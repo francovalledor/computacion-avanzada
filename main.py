@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from os import makedirs
 from PIL import Image
 from utils import pad_with_zeros, timer, BinayOperation
@@ -43,6 +44,17 @@ def fade_operation(percent: float):
     return operation
 
 
+def process_frame(
+    pixels1,
+    pixels2,
+    size,
+    operation,
+    on_finish,
+):
+    result_image = process_images(pixels1, pixels2, size, operation)
+    on_finish(result_image)
+
+
 @timer
 def run(
     image_path1: str,
@@ -50,14 +62,21 @@ def run(
     duration,
     frames_rate,
     output_dir,
-    verbose=False,
 ):
-    total_frames_count = frames_rate * duration
-    max_digit_length = len(str(total_frames_count))
-
     def save_image(image: Image, index: int):
         name = f"{output_dir}/{pad_with_zeros(index, max_digit_length)}.jpg"
         image.save(name)
+
+    total_frames_count = frames_rate * duration
+    max_digit_length = len(str(total_frames_count))
+    results = [None] * total_frames_count
+
+    def create_on_finish_callback(index: int):
+        def on_finish(image: Image):
+            print(f"Image no. {index + 1} created ✔")
+            results[index] = image
+
+        return on_finish
 
     # START PROCESSING
     image1 = load_image(image_path1)
@@ -74,16 +93,29 @@ def run(
     # Create directory if it doesn't exist
     makedirs(output_dir, exist_ok=True)
 
-    for i in range(total_frames_count):
-        percent = i / total_frames_count
+    with ThreadPoolExecutor() as executor:
+        futures = []
+        for i in range(total_frames_count):
+            percent = i / total_frames_count
+            on_finish = create_on_finish_callback(i)
 
-        if verbose:
-            print(
-                f"Generating image {pad_with_zeros(i + 1, max_digit_length)}/{total_frames_count}"
+            future = executor.submit(
+                process_frame,
+                pixels1,
+                pixels2,
+                size,
+                fade_operation(percent),
+                on_finish,
             )
+            futures.append(future)
 
-        result_image = process_images(pixels1, pixels2, size, fade_operation(percent))
-        save_image(result_image, i + 1)
+        for future in as_completed(futures):
+            pass
+
+    for i in range(total_frames_count):
+        save_image(results[i], i + 1)
+
+    print("All done!")
 
 
 if __name__ == "__main__":
@@ -116,10 +148,6 @@ if __name__ == "__main__":
         help="Duration of the video in seconds.",
     )
 
-    parser.add_argument(
-        "--verbose", action="store_true", help="Enable detailed output."
-    )
-
     args = parser.parse_args()
 
     run(
@@ -128,5 +156,4 @@ if __name__ == "__main__":
         output_dir=args.output_dir,
         frames_rate=args.frames_per_second,
         duration=args.duration,
-        verbose=args.verbose,
     )
