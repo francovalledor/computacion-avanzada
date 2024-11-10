@@ -1,6 +1,7 @@
 from os import makedirs
 from PIL import Image
 from utils import pad_with_zeros, timer, BinayOperation
+import argparse
 
 DEFUALT_OUTPUT_DIR = "result"
 DEFAULT_VIDEO_DURATION = 4
@@ -46,9 +47,9 @@ def fade_operation(percent: float):
 def run(
     image_path1: str,
     image_path2: str,
-    duration=DEFAULT_VIDEO_DURATION,
-    frames_rate=DEFAULT_FRAMES_RATE,
-    output_dir=DEFUALT_OUTPUT_DIR,
+    duration,
+    frames_rate,
+    output_dir,
 ):
     total_frames_count = frames_rate * duration
     max_digit_length = len(str(total_frames_count))
@@ -79,7 +80,42 @@ def run(
         save_image(result_image, i)
 
 
-image_path1 = "image1.jpg"
-image_path2 = "image2.jpg"
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Process two images and create a transition."
+    )
 
-run(image_path1, image_path2)
+    parser.add_argument("image1", type=str, help="Path to the first image.")
+
+    parser.add_argument("image2", type=str, help="Path to the second image.")
+
+    parser.add_argument(
+        "--output_dir",
+        type=str,
+        default=DEFUALT_OUTPUT_DIR,
+        help="Directory to save the output images.",
+    )
+
+    parser.add_argument(
+        "--frames_per_second",
+        type=int,
+        default=DEFAULT_FRAMES_RATE,
+        help="Number of frames per second.",
+    )
+
+    parser.add_argument(
+        "--duration",
+        type=int,
+        default=DEFAULT_VIDEO_DURATION,
+        help="Duration of the video in seconds.",
+    )
+
+    args = parser.parse_args()
+
+    run(
+        args.image1,
+        args.image2,
+        output_dir=args.output_dir,
+        frames_rate=args.frames_per_second,
+        duration=args.duration,
+    )
