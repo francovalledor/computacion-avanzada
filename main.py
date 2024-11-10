@@ -1,10 +1,10 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from os import makedirs
 from PIL import Image
 from utils import pad_with_zeros, timer, BinayOperation
 import argparse
+import multiprocessing
 
-DEFUALT_OUTPUT_DIR = "result"
+DEFAULT_OUTPUT_DIR = "result"
 DEFAULT_VIDEO_DURATION = 4
 DEFAULT_FRAMES_RATE = 24
 
@@ -44,15 +44,19 @@ def fade_operation(percent: float):
     return operation
 
 
-def process_frame(
-    pixels1,
-    pixels2,
-    size,
-    operation,
-    on_finish,
+def worker(
+    index: int, image_path1: str, image_path2: str, total_frames_count: int, size
 ):
+    percent = index / total_frames_count
+    operation = fade_operation(percent)
+
+    image1 = load_image(image_path1)
+    image2 = load_image(image_path2)
+    pixels1 = image1.load()
+    pixels2 = image2.load()
+
     result_image = process_images(pixels1, pixels2, size, operation)
-    on_finish(result_image)
+    return result_image
 
 
 @timer
@@ -71,13 +75,6 @@ def run(
     max_digit_length = len(str(total_frames_count))
     results = [None] * total_frames_count
 
-    def create_on_finish_callback(index: int):
-        def on_finish(image: Image):
-            print(f"Image no. {index + 1} created ✔")
-            results[index] = image
-
-        return on_finish
-
     # START PROCESSING
     image1 = load_image(image_path1)
     image2 = load_image(image_path2)
@@ -86,36 +83,24 @@ def run(
         print("Images must have the same size")
         return None
 
-    pixels1 = image1.load()
-    pixels2 = image2.load()
     size = image1.size
 
     # Create directory if it doesn't exist
     makedirs(output_dir, exist_ok=True)
 
-    with ThreadPoolExecutor() as executor:
-        futures = []
-        for i in range(total_frames_count):
-            percent = i / total_frames_count
-            on_finish = create_on_finish_callback(i)
+    num_processes = multiprocessing.cpu_count()
 
-            future = executor.submit(
-                process_frame,
-                pixels1,
-                pixels2,
-                size,
-                fade_operation(percent),
-                on_finish,
-            )
-            futures.append(future)
-
-        for future in as_completed(futures):
-            pass
+    with multiprocessing.Pool(processes=num_processes) as pool:
+        results = pool.starmap(
+            worker,
+            [
+                (i, image_path1, image_path2, total_frames_count, size)
+                for i in range(total_frames_count)
+            ],
+        )
 
     for i in range(total_frames_count):
         save_image(results[i], i + 1)
-
-    print("All done!")
 
 
 if __name__ == "__main__":
@@ -124,13 +109,12 @@ if __name__ == "__main__":
     )
 
     parser.add_argument("image1", type=str, help="Path to the first image.")
-
     parser.add_argument("image2", type=str, help="Path to the second image.")
 
     parser.add_argument(
         "--output_dir",
         type=str,
-        default=DEFUALT_OUTPUT_DIR,
+        default=DEFAULT_OUTPUT_DIR,
         help="Directory to save the output images.",
     )
 
