@@ -3,7 +3,7 @@ from PIL import Image
 from numpy import number
 from utils import timer, BinayOperation
 
-OUTPUT_DIR = "result"
+DEFUALT_OUTPUT_DIR = "result"
 
 VIDEO_DURATION = 4
 FRAMES_PER_SECOND = 24
@@ -14,7 +14,7 @@ DIGITS_COUNT = len(str(TOTAL_FRAMES_COUNT))
 def get_frame_name(index: number):
     padded_index = str(index).zfill(DIGITS_COUNT)
 
-    return f"{OUTPUT_DIR}/{padded_index}.jpg"
+    return f"{DEFUALT_OUTPUT_DIR}/{padded_index}.jpg"
 
 
 def save_image(image: Image, index: int):
@@ -57,10 +57,7 @@ def fade_operation(percent: float):
 
 
 @timer
-def run():
-    image_path1 = "image1.jpg"
-    image_path2 = "image2.jpg"
-
+def run(image_path1: str, image_path2: str):
     image1 = load_image(image_path1)
     image2 = load_image(image_path2)
 
@@ -72,7 +69,7 @@ def run():
     pixels2 = image2.load()
     size = image1.size
 
-    makedirs(OUTPUT_DIR, exist_ok=True)
+    makedirs(DEFUALT_OUTPUT_DIR, exist_ok=True)
 
     for i in range(TOTAL_FRAMES_COUNT):
         percent = i / TOTAL_FRAMES_COUNT
@@ -81,4 +78,7 @@ def run():
         save_image(result_image, i)
 
 
-run()
+image_path1 = "image1.jpg"
+image_path2 = "image2.jpg"
+
+run(image_path1, image_path2)
