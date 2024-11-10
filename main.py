@@ -1,24 +1,10 @@
 from os import makedirs
 from PIL import Image
-from numpy import number
-from utils import timer, BinayOperation
+from utils import pad_with_zeros, timer, BinayOperation
 
 DEFUALT_OUTPUT_DIR = "result"
-
-VIDEO_DURATION = 4
-FRAMES_PER_SECOND = 24
-TOTAL_FRAMES_COUNT = FRAMES_PER_SECOND * VIDEO_DURATION
-DIGITS_COUNT = len(str(TOTAL_FRAMES_COUNT))
-
-
-def get_frame_name(index: number):
-    padded_index = str(index).zfill(DIGITS_COUNT)
-
-    return f"{DEFUALT_OUTPUT_DIR}/{padded_index}.jpg"
-
-
-def save_image(image: Image, index: int):
-    image.save(get_frame_name(index))
+DEFAULT_VIDEO_DURATION = 4
+DEFAULT_FRAMES_RATE = 24
 
 
 def load_image(path):
@@ -57,7 +43,21 @@ def fade_operation(percent: float):
 
 
 @timer
-def run(image_path1: str, image_path2: str):
+def run(
+    image_path1: str,
+    image_path2: str,
+    duration=DEFAULT_VIDEO_DURATION,
+    frames_rate=DEFAULT_FRAMES_RATE,
+    output_dir=DEFUALT_OUTPUT_DIR,
+):
+    total_frames_count = frames_rate * duration
+    max_digit_length = len(str(total_frames_count))
+
+    def save_image(image: Image, index: int):
+        name = f"{output_dir}/{pad_with_zeros(index, max_digit_length)}.jpg"
+        image.save(name)
+
+    # START PROCESSING
     image1 = load_image(image_path1)
     image2 = load_image(image_path2)
 
@@ -69,10 +69,11 @@ def run(image_path1: str, image_path2: str):
     pixels2 = image2.load()
     size = image1.size
 
-    makedirs(DEFUALT_OUTPUT_DIR, exist_ok=True)
+    # Create directory if it doesn't exist
+    makedirs(output_dir, exist_ok=True)
 
-    for i in range(TOTAL_FRAMES_COUNT):
-        percent = i / TOTAL_FRAMES_COUNT
+    for i in range(total_frames_count):
+        percent = i / total_frames_count
 
         result_image = process_images(pixels1, pixels2, size, fade_operation(percent))
         save_image(result_image, i)

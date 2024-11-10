@@ -3,6 +3,10 @@ from typing import Callable
 
 
 def timer(func):
+    """
+    A decorator function to measure and print the execution time of a function.
+    """
+
     def wrapper(*args, **kwargs):
         start_time = time.time()
         result = func(*args, **kwargs)
@@ -11,6 +15,13 @@ def timer(func):
         return result
 
     return wrapper
+
+
+def pad_with_zeros(num: int, count: int):
+    """
+    Pads the input number with leading zeros to ensure a string of a specified length.
+    """
+    return str(num).zfill(count)
 
 
 BinayOperation = Callable[[int, int], int]
