@@ -1,8 +1,8 @@
+from mpi4py import MPI
 from os import makedirs
 from PIL import Image
 from utils import pad_with_zeros, timer, BinayOperation
 import argparse
-import multiprocessing
 
 DEFAULT_OUTPUT_DIR = "result"
 DEFAULT_VIDEO_DURATION = 4
@@ -44,87 +44,79 @@ def fade_operation(percent: float):
     return operation
 
 
-def worker(
-    index: int, image_path1: str, image_path2: str, total_frames_count: int, size
-):
-    percent = index / total_frames_count
-    operation = fade_operation(percent)
-
-    image1 = load_image(image_path1)
-    image2 = load_image(image_path2)
-    pixels1 = image1.load()
-    pixels2 = image2.load()
-
-    result_image = process_images(pixels1, pixels2, size, operation)
-    return result_image
+def save_image(image: Image, index: int, output_dir: str, max_digit_length: int):
+    name = f"{output_dir}/{pad_with_zeros(index, max_digit_length)}.jpg"
+    image.save(name)
 
 
 @timer
-def run(
-    image_path1: str,
-    image_path2: str,
-    duration,
-    frames_rate,
-    output_dir,
-):
-    def save_image(image: Image, index: int):
-        name = f"{output_dir}/{pad_with_zeros(index, max_digit_length)}.jpg"
-        image.save(name)
-
+def run(image_path1: str, image_path2: str, duration, frames_rate, output_dir):
     total_frames_count = frames_rate * duration
     max_digit_length = len(str(total_frames_count))
-    results = [None] * total_frames_count
-
-    # START PROCESSING
-    image1 = load_image(image_path1)
-    image2 = load_image(image_path2)
-
-    if image1.size != image2.size:
-        print("Images must have the same size")
-        return None
-
-    size = image1.size
 
     # Create directory if it doesn't exist
     makedirs(output_dir, exist_ok=True)
 
-    num_processes = multiprocessing.cpu_count()
+    # Load images only in the root process
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
 
-    with multiprocessing.Pool(processes=num_processes) as pool:
-        results = pool.starmap(
-            worker,
-            [
-                (i, image_path1, image_path2, total_frames_count, size)
-                for i in range(total_frames_count)
-            ],
-        )
+    if rank == 0:
+        image1 = load_image(image_path1)
+        image2 = load_image(image_path2)
 
-    for i in range(total_frames_count):
-        save_image(results[i], i + 1)
+        if image1.size != image2.size:
+            print("Images must have the same size")
+            return None
+
+        pixels1 = image1.load()
+        pixels2 = image2.load()
+        image_dimensions = image1.size
+
+        frames = [
+            (pixels1, pixels2, image_dimensions, fade_operation(i / total_frames_count))
+            for i in range(total_frames_count)
+        ]
+    else:
+        frames = None
+
+    # Broadcast the frames to all processes
+    frames = comm.bcast(frames, root=0)
+
+    # Each process works on a subset of frames
+    for i in range(rank, total_frames_count, size):
+        pixels1, pixels2, size, operation = frames[i]
+        image = process_images(pixels1, pixels2, size, operation)
+        comm.send((i, image), dest=0)
+
+    # Root process collects results
+    if rank == 0:
+        for _ in range(size):
+            index, image = comm.recv(source=MPI.ANY_SOURCE)
+            save_image(image, index + 1, output_dir, max_digit_length)
+
+        print("All done!")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Process two images and create a transition."
     )
-
     parser.add_argument("image1", type=str, help="Path to the first image.")
     parser.add_argument("image2", type=str, help="Path to the second image.")
-
     parser.add_argument(
         "--output_dir",
         type=str,
         default=DEFAULT_OUTPUT_DIR,
         help="Directory to save the output images.",
     )
-
     parser.add_argument(
         "--frames_per_second",
         type=int,
         default=DEFAULT_FRAMES_RATE,
         help="Number of frames per second.",
     )
-
     parser.add_argument(
         "--duration",
         type=int,
