@@ -76,8 +76,11 @@ def run(
     for i in range(total_frames_count):
         percent = i / total_frames_count
 
+        print(
+            f"Generating image {pad_with_zeros(i + 1, max_digit_length)}/{total_frames_count}"
+        )
         result_image = process_images(pixels1, pixels2, size, fade_operation(percent))
-        save_image(result_image, i)
+        save_image(result_image, i + 1)
 
 
 if __name__ == "__main__":
