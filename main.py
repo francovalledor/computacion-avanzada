@@ -1,7 +1,8 @@
+import time
 from mpi4py import MPI
 from os import makedirs
 from PIL import Image
-from utils import pad_with_zeros, timer
+from utils import pad_with_zeros
 import argparse
 
 DEFAULT_OUTPUT_DIR = "result"
@@ -50,7 +51,6 @@ def save_image(image: Image, index: int, output_dir: str, max_digit_length: int)
     image.save(name)
 
 
-@timer
 def run(image_path1: str, image_path2: str, duration, frames_rate, output_dir):
     comm = MPI.COMM_WORLD
     my_id = comm.Get_rank()
@@ -61,6 +61,7 @@ def run(image_path1: str, image_path2: str, duration, frames_rate, output_dir):
 
     # checks
     if my_id == 0:
+        start_time = time.time()
         # Create directory if it doesn't exist
         makedirs(output_dir, exist_ok=True)
 
@@ -86,7 +87,8 @@ def run(image_path1: str, image_path2: str, duration, frames_rate, output_dir):
     comm.Barrier()
 
     if my_id == 0:
-        print("All done!")
+        end_time = time.time()
+        print(f"Execution time: {end_time - start_time:.4f} seconds")
 
 
 if __name__ == "__main__":
