@@ -1,7 +1,8 @@
+import time
 from mpi4py import MPI
 from os import makedirs
 from PIL import Image
-from utils import pad_with_zeros, timer
+from utils import pad_with_zeros
 import argparse
 
 DEFAULT_OUTPUT_DIR = "result"
@@ -14,27 +15,28 @@ def load_image(path):
         image = Image.open(path).convert("RGB")
         return image
     except Exception as e:
-        print(f"Error loading image: {e}")
-        return None
+        raise Exception(f"Error loading image: {e}")
 
 
 def process_images(pixels1, pixels2, size, index, total_frames_count):
     operation = fade_operation(index / total_frames_count)
-    result_image = Image.new("RGB", size)
-    result_pixels = result_image.load()
 
-    (width, height) = size
+    result_pixels = []
 
-    for i in range(width):
-        for j in range(height):
-            r1, g1, b1 = pixels1[i, j]
-            r2, g2, b2 = pixels2[i, j]
-            result_pixels[i, j] = (
+    for i in range(len(pixels1)):
+        (r1, g1, b1) = pixels1[i]
+        (r2, g2, b2) = pixels2[i]
+
+        result_pixels.append(
+            (
                 operation(r1, r2),
                 operation(g1, g2),
                 operation(b1, b2),
             )
+        )
 
+    result_image = Image.new("RGB", size)
+    result_image.putdata(result_pixels)
     return result_image
 
 
@@ -50,7 +52,6 @@ def save_image(image: Image, index: int, output_dir: str, max_digit_length: int)
     image.save(name)
 
 
-@timer
 def run(image_path1: str, image_path2: str, duration, frames_rate, output_dir):
     comm = MPI.COMM_WORLD
     my_id = comm.Get_rank()
@@ -59,8 +60,10 @@ def run(image_path1: str, image_path2: str, duration, frames_rate, output_dir):
     total_frames_count = frames_rate * duration
     max_digit_length = len(str(total_frames_count))
 
-    # checks
+    # Checks and loading images
     if my_id == 0:
+        start_time = time.time()
+
         # Create directory if it doesn't exist
         makedirs(output_dir, exist_ok=True)
 
@@ -70,23 +73,52 @@ def run(image_path1: str, image_path2: str, duration, frames_rate, output_dir):
         if image1.size != image2.size:
             raise Exception("Images must have the same size")
 
-    comm.Barrier()
+        # Convert pixel data to a serializable format (list)
+        pixels1 = list(image1.getdata())
+        pixels2 = list(image2.getdata())
+        image_size = image1.size
 
-    # start execution
-    image1 = load_image(image_path1)
-    image2 = load_image(image_path2)
-    pixels1 = image1.load()
-    pixels2 = image2.load()
-    image_size = image1.size
+    else:
+        pixels1 = None
+        pixels2 = None
+        image_size = None
 
+    # Broadcast the image size to all processes
+    image_size = comm.bcast(image_size, root=0)
+
+    # Scatter pixel data to all processes
+    pixels1 = comm.bcast(pixels1, root=0)
+    pixels2 = comm.bcast(pixels2, root=0)
+
+    results = []
+
+    # Start processing each process
     for i in range(my_id, total_frames_count, total_processes):
         image_i = process_images(pixels1, pixels2, image_size, i, total_frames_count)
-        save_image(image_i, i, output_dir, max_digit_length)
+        results.append((i, image_i))
+
+    # Send results back to process 0
+    if my_id != 0:
+        comm.send(results, dest=0)
+    else:
+        for index, result_image in results:
+            save_image(result_image, index, output_dir, max_digit_length)
+
+        # Receive results from other processes
+        for source in range(1, total_processes):
+            try:
+                results = comm.recv(source=source)
+
+                for index, image in results:
+                    save_image(image, index, output_dir, max_digit_length)
+            except Exception:
+                break
 
     comm.Barrier()
 
     if my_id == 0:
-        print("All done!")
+        end_time = time.time()
+        print(f"Execution time: {end_time - start_time:.4f} seconds")
 
 
 if __name__ == "__main__":
