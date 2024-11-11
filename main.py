@@ -1,7 +1,7 @@
 from mpi4py import MPI
 from os import makedirs
 from PIL import Image
-from utils import pad_with_zeros, timer, BinayOperation
+from utils import pad_with_zeros, timer
 import argparse
 
 DEFAULT_OUTPUT_DIR = "result"
@@ -18,7 +18,8 @@ def load_image(path):
         return None
 
 
-def process_images(pixels1, pixels2, size, operation: BinayOperation):
+def process_images(pixels1, pixels2, size, index, total_frames_count):
+    operation = fade_operation(index / total_frames_count)
     result_image = Image.new("RGB", size)
     result_pixels = result_image.load()
 
@@ -51,52 +52,31 @@ def save_image(image: Image, index: int, output_dir: str, max_digit_length: int)
 
 @timer
 def run(image_path1: str, image_path2: str, duration, frames_rate, output_dir):
+    comm = MPI.COMM_WORLD
+    my_id = comm.Get_rank()
+    total_processes = comm.Get_size()
+
     total_frames_count = frames_rate * duration
     max_digit_length = len(str(total_frames_count))
 
     # Create directory if it doesn't exist
-    makedirs(output_dir, exist_ok=True)
+    if my_id == 0:
+        makedirs(output_dir, exist_ok=True)
 
-    # Load images only in the root process
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    size = comm.Get_size()
+    image1 = load_image(image_path1)
+    image2 = load_image(image_path2)
 
-    if rank == 0:
-        image1 = load_image(image_path1)
-        image2 = load_image(image_path2)
+    if image1.size != image2.size:
+        print("Images must have the same size")
+        return None
 
-        if image1.size != image2.size:
-            print("Images must have the same size")
-            return None
+    pixels1 = image1.load()
+    pixels2 = image2.load()
+    image_size = image1.size
 
-        pixels1 = image1.load()
-        pixels2 = image2.load()
-        image_dimensions = image1.size
-
-        frames = [
-            (pixels1, pixels2, image_dimensions, fade_operation(i / total_frames_count))
-            for i in range(total_frames_count)
-        ]
-    else:
-        frames = None
-
-    # Broadcast the frames to all processes
-    frames = comm.bcast(frames, root=0)
-
-    # Each process works on a subset of frames
-    for i in range(rank, total_frames_count, size):
-        pixels1, pixels2, size, operation = frames[i]
-        image = process_images(pixels1, pixels2, size, operation)
-        comm.send((i, image), dest=0)
-
-    # Root process collects results
-    if rank == 0:
-        for _ in range(size):
-            index, image = comm.recv(source=MPI.ANY_SOURCE)
-            save_image(image, index + 1, output_dir, max_digit_length)
-
-        print("All done!")
+    for i in range(my_id, total_frames_count, total_processes):
+        image_i = process_images(pixels1, pixels2, image_size, i, total_frames_count)
+        save_image(image_i, i, output_dir, max_digit_length)
 
 
 if __name__ == "__main__":
