@@ -59,17 +59,22 @@ def run(image_path1: str, image_path2: str, duration, frames_rate, output_dir):
     total_frames_count = frames_rate * duration
     max_digit_length = len(str(total_frames_count))
 
-    # Create directory if it doesn't exist
+    # checks
     if my_id == 0:
+        # Create directory if it doesn't exist
         makedirs(output_dir, exist_ok=True)
 
+        image1 = load_image(image_path1)
+        image2 = load_image(image_path2)
+
+        if image1.size != image2.size:
+            raise Exception("Images must have the same size")
+
+    comm.Barrier()
+
+    # start execution
     image1 = load_image(image_path1)
     image2 = load_image(image_path2)
-
-    if image1.size != image2.size:
-        print("Images must have the same size")
-        return None
-
     pixels1 = image1.load()
     pixels2 = image2.load()
     image_size = image1.size
@@ -77,6 +82,11 @@ def run(image_path1: str, image_path2: str, duration, frames_rate, output_dir):
     for i in range(my_id, total_frames_count, total_processes):
         image_i = process_images(pixels1, pixels2, image_size, i, total_frames_count)
         save_image(image_i, i, output_dir, max_digit_length)
+
+    comm.Barrier()
+
+    if my_id == 0:
+        print("All done!")
 
 
 if __name__ == "__main__":
