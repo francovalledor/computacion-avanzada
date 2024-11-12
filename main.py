@@ -1,12 +1,16 @@
 from os import makedirs
 from PIL import Image
-from utils import pad_with_zeros, timer, BinayOperation
+from utils import pad_with_zeros, timer, BinaryOperation
 import argparse
 import multiprocessing
 
 DEFAULT_OUTPUT_DIR = "result"
 DEFAULT_VIDEO_DURATION = 4
 DEFAULT_FRAMES_RATE = 24
+
+
+def save_image(image: Image, name: str):
+    image.save(name)
 
 
 def load_image(path):
@@ -18,7 +22,7 @@ def load_image(path):
         return None
 
 
-def process_images(pixels1, pixels2, size, operation: BinayOperation):
+def process_images(pixels1, pixels2, size, operation: BinaryOperation):
     result_image = Image.new("RGB", size)
     result_pixels = result_image.load()
 
@@ -45,9 +49,12 @@ def fade_operation(percent: float):
 
 
 def worker(
-    index: int, image_path1: str, image_path2: str, total_frames_count: int, size
+    image_path1: str,
+    image_path2: str,
+    output_name: str,
+    percent: float,
+    size,
 ):
-    percent = index / total_frames_count
     operation = fade_operation(percent)
 
     image1 = load_image(image_path1)
@@ -56,7 +63,7 @@ def worker(
     pixels2 = image2.load()
 
     result_image = process_images(pixels1, pixels2, size, operation)
-    return result_image
+    save_image(result_image, output_name)
 
 
 @timer
@@ -66,14 +73,17 @@ def run(
     duration,
     frames_rate,
     output_dir,
+    num_processes,
 ):
-    def save_image(image: Image, index: int):
-        name = f"{output_dir}/{pad_with_zeros(index, max_digit_length)}.jpg"
-        image.save(name)
+    def get_image_name(index: int):
+        return f"{output_dir}/{pad_with_zeros(index, max_digit_length)}.jpg"
 
     total_frames_count = frames_rate * duration
     max_digit_length = len(str(total_frames_count))
-    results = [None] * total_frames_count
+
+    print(f"using {num_processes} processes")
+    print(f"{total_frames_count} to be created. {duration}s at {frames_rate} fps")
+    print(f"Output dir: '{output_dir}'")
 
     # START PROCESSING
     image1 = load_image(image_path1)
@@ -88,19 +98,22 @@ def run(
     # Create directory if it doesn't exist
     makedirs(output_dir, exist_ok=True)
 
-    num_processes = multiprocessing.cpu_count()
-
     with multiprocessing.Pool(processes=num_processes) as pool:
-        results = pool.starmap(
+        pool.starmap(
             worker,
             [
-                (i, image_path1, image_path2, total_frames_count, size)
-                for i in range(total_frames_count)
+                (
+                    image_path1,
+                    image_path2,
+                    get_image_name(index),
+                    index / total_frames_count,
+                    size,
+                )
+                for index in range(total_frames_count)
             ],
         )
 
-    for i in range(total_frames_count):
-        save_image(results[i], i + 1)
+    print("All done!")
 
 
 if __name__ == "__main__":
@@ -132,6 +145,13 @@ if __name__ == "__main__":
         help="Duration of the video in seconds.",
     )
 
+    parser.add_argument(
+        "--processes",
+        type=int,
+        default=multiprocessing.cpu_count(),
+        help="Duration of the video in seconds.",
+    )
+
     args = parser.parse_args()
 
     run(
@@ -140,4 +160,5 @@ if __name__ == "__main__":
         output_dir=args.output_dir,
         frames_rate=args.frames_per_second,
         duration=args.duration,
+        num_processes=args.processes,
     )
