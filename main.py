@@ -55,6 +55,10 @@ def run(
     total_frames_count = frames_rate * duration
     max_digit_length = len(str(total_frames_count))
 
+    print("using 1 process")
+    print(f"{total_frames_count} to be created. {duration}s at {frames_rate} fps")
+    print(f"Output dir: '{output_dir}'")
+
     def save_image(image: Image, index: int):
         name = f"{output_dir}/{pad_with_zeros(index, max_digit_length)}.jpg"
         image.save(name)
