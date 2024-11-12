@@ -73,6 +73,10 @@ def run(
     max_digit_length = len(str(total_frames_count))
     results = [None] * total_frames_count
 
+    print(f"using {num_processes} processes")
+    print(f"{total_frames_count} to be created. {duration}s at {frames_rate} fps")
+    print(f"Output dir: '{output_dir}'")
+
     def create_on_finish_callback(index: int):
         def on_finish(image: Image):
             print(f"Image no. {index + 1} created ✔")
