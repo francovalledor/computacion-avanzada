@@ -1,6 +1,6 @@
 from os import makedirs
 from PIL import Image
-from utils import pad_with_zeros, timer, BinaryOperation
+from utils import create_video_from_images, pad_with_zeros, timer, BinaryOperation
 import argparse
 
 DEFUALT_OUTPUT_DIR = "result"
@@ -89,6 +89,8 @@ def run(
         operation = fade_operation(percent)
         result_image = process_image(pixels1, pixels2, size, operation)
         save_image(result_image, i + 1)
+
+    create_video_from_images(output_dir, "output", frames_rate)
 
 
 if __name__ == "__main__":
