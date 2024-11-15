@@ -60,11 +60,11 @@ def run(image_path1: str, image_path2: str, duration, frames_rate, output_dir):
     total_frames_count = frames_rate * duration
     max_digit_length = len(str(total_frames_count))
 
-    print(f"{total_frames_count} to be created. {duration}s at {frames_rate} fps")
-    print(f"Output dir: '{output_dir}'")
-
     # Checks and loading images
     if my_id == 0:
+        print(f"{total_frames_count} to be created. {duration}s at {frames_rate} fps")
+        print(f"Output dir: '{output_dir}'")
+
         start_time = time.time()
 
         # Create directory if it doesn't exist
