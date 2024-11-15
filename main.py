@@ -2,7 +2,7 @@ import time
 from mpi4py import MPI
 from os import makedirs
 from PIL import Image
-from utils import pad_with_zeros
+from utils import create_video_from_images, pad_with_zeros
 import argparse
 
 DEFAULT_OUTPUT_DIR = "result"
@@ -123,6 +123,8 @@ def run(image_path1: str, image_path2: str, duration, frames_rate, output_dir):
     if my_id == 0:
         end_time = time.time()
         print(f"Execution time: {end_time - start_time:.4f} seconds")
+
+        create_video_from_images(output_dir, "output", frames_rate)
 
 
 if __name__ == "__main__":
