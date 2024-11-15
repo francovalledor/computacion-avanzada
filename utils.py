@@ -24,4 +24,4 @@ def pad_with_zeros(num: int, count: int):
     return str(num).zfill(count)
 
 
-BinayOperation = Callable[[int, int], int]
+BinaryOperation = Callable[[int, int], int]

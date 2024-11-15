@@ -1,6 +1,6 @@
 from os import makedirs
 from PIL import Image
-from utils import pad_with_zeros, timer, BinayOperation
+from utils import pad_with_zeros, timer, BinaryOperation
 import argparse
 
 DEFUALT_OUTPUT_DIR = "result"
@@ -17,7 +17,7 @@ def load_image(path):
         return None
 
 
-def process_images(pixels1, pixels2, size, operation: BinayOperation):
+def process_image(pixels1, pixels2, size, operation: BinaryOperation):
     result_image = Image.new("RGB", size)
     result_pixels = result_image.load()
 
@@ -86,7 +86,8 @@ def run(
                 f"Generating image {pad_with_zeros(i + 1, max_digit_length)}/{total_frames_count}"
             )
 
-        result_image = process_images(pixels1, pixels2, size, fade_operation(percent))
+        operation = fade_operation(percent)
+        result_image = process_image(pixels1, pixels2, size, operation)
         save_image(result_image, i + 1)
 
 
