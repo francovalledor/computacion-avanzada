@@ -1,6 +1,6 @@
 from os import makedirs
 from PIL import Image
-from utils import pad_with_zeros, timer, BinaryOperation
+from utils import create_video_from_images, pad_with_zeros, timer, BinaryOperation
 import argparse
 import multiprocessing
 
@@ -113,7 +113,7 @@ def run(
             ],
         )
 
-    print("All done!")
+    create_video_from_images(output_dir, "output", frames_rate)
 
 
 if __name__ == "__main__":
