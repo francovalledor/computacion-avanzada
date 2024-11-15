@@ -18,8 +18,8 @@ def load_image(path):
         raise Exception(f"Error loading image: {e}")
 
 
-def process_images(pixels1, pixels2, size, index, total_frames_count):
-    operation = fade_operation(index / total_frames_count)
+def process_images(pixels1, pixels2, size, percent):
+    operation = fade_operation(percent)
 
     result_pixels = []
 
@@ -97,7 +97,8 @@ def run(image_path1: str, image_path2: str, duration, frames_rate, output_dir):
 
     # Start processing each process
     for i in range(my_id, total_frames_count, total_processes):
-        image_i = process_images(pixels1, pixels2, image_size, i, total_frames_count)
+        percent = i / total_frames_count
+        image_i = process_images(pixels1, pixels2, image_size, percent)
         results.append((i, image_i))
 
     # Send results back to process 0
